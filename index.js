@@ -547,7 +547,7 @@ FSWatcher.prototype._remove = function(directory, item) {
 
   // Check if item was on the watched list and remove it
   var parent = this._getWatchedDir(directory);
-  var wasTracked = parent.has(item);
+  var wasTracked = parent.has(item) || directory === path;
   parent.remove(item);
 
   // If we wait for this file to be fully written, cancel the wait.

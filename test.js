@@ -148,6 +148,10 @@ function runTests(baseopts) {
     return watcher = chokidar.watch(fixturesPath, options);
   }
 
+  function dirWatcher(dirPath) {
+    return watcher = chokidar.watch(dirPath, options);
+  }
+
   function waitFor(spies, fn) {
     function isSpyReady(spy) {
       return Array.isArray(spy) ? spy[0].callCount >= spy[1] : spy.callCount;
@@ -163,6 +167,74 @@ function runTests(baseopts) {
     }, 5);
     var to = setTimeout(finish, 3500);
   }
+
+  // describe('watch a non existing directory', function() {
+  //   var nonExistingDir, readySpy, rawSpy;
+  //   beforeEach(function() {
+  //     nonExistingDir = getFixturePath('subdir');
+  //     options.ignoreInitial = true;
+  //     options.alwaysStat = true;
+  //     readySpy = sinon.spy(function readySpy(){});
+  //     rawSpy = sinon.spy(function rawSpy(){});
+  //     dirWatcher(nonExistingDir).on('ready', readySpy).on('raw', rawSpy);
+  //   });
+  //   afterEach(function(done) {
+  //     waitFor([readySpy], function() {
+  //       readySpy.should.have.been.calledOnce;
+  //       rawSpy = undefined;
+  //       closeWatchers(done);
+  //     });
+  //   });
+  //   it('should emit `addDir` event when directory was added', function(done) {
+  //     var spy = sinon.spy();
+  //     var testDir = getFixturePath('subdir');
+  //     watcher.on('addDir', spy).on('ready', w(function() {
+  //       spy.should.not.have.been.called;
+  //       fs.mkdir(testDir, 0x1ed, simpleCb);
+  //       waitFor([spy], function() {
+  //         spy.should.have.been.calledOnce;
+  //         spy.should.have.been.calledWith(testDir);
+  //         expect(spy.args[0][1]).to.be.ok; // stats
+  //         rawSpy.should.have.been.called;
+  //         done();
+  //       });
+  //     }));
+  //   });
+  // });
+
+  // describe('watch an empty directory', function() {
+  //   var emptyDir, readySpy, rawSpy;
+  //   beforeEach(function() {
+  //     emptyDir = getFixturePath('subdir');
+  //     fs.mkdirSync(emptyDir, 0x1ed);
+  //     options.ignoreInitial = true;
+  //     options.alwaysStat = true;
+  //     readySpy = sinon.spy(function readySpy(){});
+  //     rawSpy = sinon.spy(function rawSpy(){});
+  //     dirWatcher(emptyDir).on('ready', readySpy).on('raw', rawSpy);
+  //   });
+  //   afterEach(function(done) {
+  //     waitFor([readySpy], function() {
+  //       readySpy.should.have.been.calledOnce;
+  //       rawSpy = undefined;
+  //       closeWatchers(done);
+  //     });
+  //   });
+  //   it('should emit `unlinkDir` event when a directory was removed', function(done) {
+  //     var spy = sinon.spy();
+  //     var testDir = getFixturePath('subdir');
+  //     watcher.on('unlinkDir', spy).on('ready', function() {
+  //       w(fs.rmdir.bind(fs, testDir, simpleCb))();
+  //       waitFor([spy], function() {
+  //         spy.should.have.been.calledWith(testDir);
+  //         expect(spy.args[0][1]).to.not.be.ok; // no stats
+  //         rawSpy.should.have.been.called;
+  //         if (!osXFsWatch010) spy.should.have.been.calledOnce;
+  //         done();
+  //       });
+  //     });
+  //   });
+  // });
 
   describe('watch a directory', function() {
     var readySpy, rawSpy;
@@ -475,6 +547,27 @@ function runTests(baseopts) {
             });
         });
       });
+    });
+  });
+  describe('watch empty directory', function() {
+    it('should emit `unlinkDir` event when a directory was removed', function(done) {
+      var spy = sinon.spy();
+      var rawSpy = sinon.spy();
+      var testDir = getFixturePath('subdir');
+      fs.mkdirSync(testDir, 0x1ed);
+      watcher = chokidar.watch(testDir, options)
+        .on('unlinkDir', spy)
+        .on('raw', rawSpy)
+        .on('ready', function() {
+          w(fs.rmdir.bind(fs, testDir, simpleCb))();
+          waitFor([spy], function() {
+            spy.should.have.been.calledWith(testDir);
+            expect(spy.args[0][1]).to.not.be.ok; // no stats
+            rawSpy.should.have.been.called;
+            if (!osXFsWatch010) spy.should.have.been.calledOnce;
+            done();
+          });
+        });
     });
   });
   describe('watch non-existent paths', function() {
@@ -1751,7 +1844,9 @@ function runTests(baseopts) {
     it('should ignore unwatched paths that are a subset of watched paths', function(done) {
       var spy = sinon.spy();
       watcher = chokidar.watch(fixturesPath, options)
-        .on('all', spy)
+        .on('all', function() {
+          spy.apply(null, arguments);
+        })
         .on('ready', w(function() {
           // test with both relative and absolute paths
           var subdirRel = sysPath.relative(process.cwd(), getFixturePath('subdir'));
